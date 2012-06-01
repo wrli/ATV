@@ -107,7 +107,23 @@ public class TestScene extends Scene {
 
 	void drawWheels() {
 		for (Wheel wheel : wheels) {
-			wheel.draw(calcAngleBetween(wheel.getAxis(), center), false);
+			
+			float a = calcAngleBetween(wheel.getAxis(), center);
+			
+			pushStyle();
+			
+			stroke(Colors.GREEN_LIGHT2);
+			noFill();
+			
+			line(wheel.getAxis().x, -wheel.getAxis().y, center.x, -center.y);
+			
+			int r = (int) dist(wheel.getAxis().x, wheel.getAxis().y, center.x, center.y);
+			
+			arc(center.x, -center.y, 2*r, 2*r, a, a+.1F);
+			
+			popStyle();
+			
+			wheel.draw(a, false);
 		}
 	}
 

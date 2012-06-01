@@ -29,10 +29,10 @@ public class ATV extends PApplet {
 	int zeroX = 350;
 	int zeroY = 300;
 
-	int centerX = 0; // x kordinata sjecišta sa x-osi (y=0)
-	int centerY = 0; // y kordinata sjecišta sa y-osi (x=0)
-	float _centerX = 0; // x kordinata sjecišta sa x-osi (y=0)
-	float _centerY = 0; // y kordinata sjecišta sa y-osi (x=0)
+	int centerX = 0; // x kordinata sjecista sa x-osi (y=0)
+	int centerY = 0; // y kordinata sjecista sa y-osi (x=0)
+	float _centerX = 0; // x kordinata sjecista sa x-osi (y=0)
+	float _centerY = 0; // y kordinata sjecista sa y-osi (x=0)
 
 	int wheelL = -50;
 	int wheelR = +50;
