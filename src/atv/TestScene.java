@@ -1,5 +1,7 @@
 package atv;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -18,35 +20,49 @@ public class TestScene extends Scene {
 	
 	private Point mousep = new Point();
 
-
-	int wheelA = 41;
-	int wheelB = 100;
-
 	List<Wheel> wheels = new LinkedList<Wheel>();
+	
+	float ctrlX, ctrlY, ctrlZ;
+	final static float CTRL_STEP_XY = .01F; 
+	final static float CTRL_STEP_Z = .05F; 
+	final static int CIRCLE_RADIUS = 200;
+	final static float DEAD_BAND_XY = .03F;
+	final static float DEAD_BAND_SPEED = .01F;
 
 	float angle = 0F;
 	
-	private void createWheels(int count, int radiusX, int radiusY) {
-		float a = PI;		
-		if (count % 2 == 0) a = 2*PI / count / 2;
-		
-		for (int i = 0; i < count; i++) {
-			wheels.add(new Wheel(this, (a > 0 ? Side.RIGHT : Side.LEFT), new Point((int)round(sin(a) * radiusX), (int)round(cos(a) * radiusY))));
-			a = angle(a + 2*PI / count);
+	
+	private void createSquareBody(int countX, int countY, int width, int height) {
+		for (int x = 0; x < countX; x++) {
+			for (int y = 0; y < countY; y++) {
+				if (x == 0 || x == countX-1 || y == 0 || y == countY-1) 
+					wheels.add(new Wheel(this, new Point(-width/2 + (int)round(width/(countX-1)) * x, -height/2 + (int)round(height/(countY-1)) * y)));
+			}
 		}
-
+		Collections.sort(wheels, new Comparator<Wheel>() {
+			@Override
+			public int compare(Wheel o1, Wheel o2) {
+				float a1 = calcAngleBetween(new Point(), o1.getAxis());
+				float a2 = calcAngleBetween(new Point(), o2.getAxis());
+				if (a1 > a2) return 1;
+				if (a1 < a2) return -1;
+				return 0;
+			}
+		});
 	}
 
 	public void setup() {		
-		createWheels(4, 50, 80);
+		//createRoundBody(6, 80, 80);
+//		createSquareBody(2, 3, 141, 200);
+		createSquareBody(2, 2, 141, 141);
 		
 		size(1000, 600);
 
 		stroke(0);
 		smooth();
-		frameRate(10);
+		frameRate(20);
 
-		noLoop();
+		//noLoop();
 	}
 
 	private volatile boolean drawing = false;
@@ -58,73 +74,211 @@ public class TestScene extends Scene {
 		drawFps();
 		
 		
-		textAlign(LEFT, BOTTOM);
-		int i = 0; for (String debug : debugs) text(debug, 0, i+=15);
-		debugs.clear();
+		drawDebugs();
+
+		drawCtrl();
 
 		translate(zero.x, zero.y);
 		
+		debugs.add("ctrl: " + ctrlX + ", " + ctrlY + ", " + ctrlZ);
 		debugs.add("mousep: " + mousep);
 		debugs.add("center: " + center);
-		angle = calcAngleBetween(new Point(0, 0), center);
+		angle = calcAngleBetween(0, 0, ctrlX, ctrlY);
 		
 		debugs.add(String.valueOf(angle));
-
+		
 		drawAxes();
 
 		drawDebug();
+		
+		drawTrails();
 
 		drawWheels();
 
 		drawing = false;
 	}
 
-
 	@Override
 	public void mouseMoved() {
 		if (drawing)
 			return;
 
-		center = mousep = new Point(mouseX-zero.x, -mouseY+zero.y);
+		mousep = new Point(mouseX-zero.x, -mouseY+zero.y);
+		
+		if (dist(mousep.x, mousep.y, 0, 0) <= CIRCLE_RADIUS) {
+			ctrlX = mousep.x / (float)CIRCLE_RADIUS;
+			ctrlY = mousep.y / (float)CIRCLE_RADIUS;
+		}
+	}
+	
+	@Override
+	public void keyPressed() {
+		debugs.add("" + keyCode);
+		float other;
+		switch (keyCode) {
+		case Keys.LEFT:
+			ctrlX = max(-1F, ctrlX - CTRL_STEP_XY);
+			other = (float) sqrt(1F - ctrlX * ctrlX);
+			ctrlY = max(-other, min(other, ctrlY));
+			break;
+		case Keys.RIGHT:
+			ctrlX = min(1F, ctrlX + CTRL_STEP_XY);
+			other = (float) sqrt(1F - ctrlX * ctrlX);
+			ctrlY = max(-other, min(other, ctrlY));
+			break;
+		case Keys.DOWN:
+			ctrlY = max(-1F, ctrlY - CTRL_STEP_XY);
+			other = (float) sqrt(1F - ctrlY * ctrlY);
+			ctrlX = max(-other, min(other, ctrlX));
+			break;
+		case Keys.UP:
+			ctrlY = min(1F, ctrlY + CTRL_STEP_XY);
+			other = (float) sqrt(1F - ctrlY * ctrlY);
+			ctrlX = max(-other, min(other, ctrlX));
+			break;
+		case Keys.CW:
+			ctrlZ = min(HALF_PI, ctrlZ + CTRL_STEP_Z);
+			break;
+		case Keys.CCW:
+			ctrlZ = max(-HALF_PI, ctrlZ - CTRL_STEP_Z);
+			break;
+		case Keys.RESET:
+			ctrlX = ctrlY = ctrlZ = 0;
+			break;
+		}
+		
+		if (abs(ctrlX) < CTRL_STEP_XY) ctrlX = 0;
+		if (abs(ctrlY) < CTRL_STEP_XY) ctrlY = 0;
+		if (abs(ctrlZ) < CTRL_STEP_Z) ctrlZ = 0;
+
+//		center = new Point((int)(CIRCLE_RADIUS * ctrlX), (int)(CIRCLE_RADIUS * ctrlY));
 		
 		redraw();
 	}
 
+	void drawCtrl() {
+		int r = 50;
+		
+		pushStyle();
+		pushMatrix();
+		
+		noFill();
+		strokeWeight(.8F);
+		stroke(0xFF999999);
+		
+		translate(width-r-10, r+10);
+		
+		ellipse(0, 0, 2*r, 2*r);
+		
+		stroke(0xFF333333);
+		strokeWeight(2F);
+		fill(0xFFAAAAAA);
+		
+		translate(r * ctrlX, r * -ctrlY);
+		
+		rotate(ctrlZ);
+		
+		ellipse(0, 0, 10, 20);
+		
+		popMatrix();
+		popStyle();
+	}
 
 
 	void drawDebug() {
 		pushStyle();
 
-		stroke(Colors.RED);
+		stroke(Colors.BLUE);
 		strokeWeight(.5F);
+		noFill();
 
-		line(0, 0, center.x, -center.y);
+		line(0, 0, ctrlX * CIRCLE_RADIUS, -ctrlY * CIRCLE_RADIUS);
+		
+		ellipse(0, 0, 2 * CIRCLE_RADIUS * DEAD_BAND_XY, 2 * CIRCLE_RADIUS * DEAD_BAND_XY);
+		ellipse(0, 0, 2 * CIRCLE_RADIUS, 2 * CIRCLE_RADIUS);
 
-		arc(0, 0, 50, 50, -PI/4, 0);
+		//arc(0, 0, 50, 50, -PI/4, 0);
+		
+		if (ctrlZ != 0) {
+			if (ctrlY > 0)
+				stroke(Colors.GREEN);
+			else
+				stroke(Colors.RED);
+			line(0, 0, center.x, -center.y);
+		}
 
 		popStyle();
 	}
 
 	void drawWheels() {
-		for (Wheel wheel : wheels) {
+		float speed = dist(0, 0, ctrlX, ctrlY);
+		Float angle = calcAngleBetween(0, 0, ctrlX, ctrlY);
+		
+		if (speed < DEAD_BAND_SPEED) {
+			for (Wheel wheel : wheels) {
+				wheel.draw(null, 0);
+			}
+		} else
+		if (ctrlZ == 0) {
+			for (Wheel wheel : wheels) {
+				wheel.draw(angle, speed);
+			}
+		} else {	
+			angle = angle + HALF_PI * signum(ctrlZ) * signum(ctrlY);
 			
-			float a = calcAngleBetween(wheel.getAxis(), center);
+			float r = 1 / abs(pow(ctrlZ, 5));
+			float cR = r * CIRCLE_RADIUS;
+			center.x = (int) (cos(angle) * cR);
+			center.y = (int) (-sin(angle) * cR);
 			
-			pushStyle();
-			
-			stroke(Colors.GREEN_LIGHT2);
-			noFill();
-			
-			line(wheel.getAxis().x, -wheel.getAxis().y, center.x, -center.y);
-			
-			int r = (int) dist(wheel.getAxis().x, wheel.getAxis().y, center.x, center.y);
-			
-			arc(center.x, -center.y, 2*r, 2*r, a, a+.1F);
-			
-			popStyle();
-			
-			wheel.draw(a, false);
+			for (Wheel wheel : wheels) {
+				float a = calcAngleBetween(wheel.getAxis(), center) - HALF_PI * signum(ctrlZ) * signum(ctrlY);
+				float s = speed * dist(wheel.getAxis().x, wheel.getAxis().y, center.x, center.y) / cR;
+				wheel.draw(a, s);
+			}
 		}
+	}
+	
+	void drawTrails() {
+		pushStyle();
+		noFill();
+		stroke(Colors.METAL);
+		strokeWeight(.1F);
+		for (Wheel wheel : wheels) {
+			pushMatrix();
+			translate(wheel.getAxis().x, wheel.getAxis().y);
+			float x = 0F, y = 0F;
+			beginShape();
+			curveVertex(0, 0);
+			for (int i = 0; i < Wheel.TRAIL_POINTS; i++) {
+				curveVertex(x -= wheel.trail[(wheel.trailLast - i) % Wheel.TRAIL_POINTS].x, y -= wheel.trail[(wheel.trailLast - i) % Wheel.TRAIL_POINTS].y);
+			}
+			endShape();
+			popMatrix();
+		}
+		
+		float[] x = new float[wheels.size()];
+		float[] y = new float[wheels.size()];
+		for (int i = 0; i < wheels.size(); i++) {
+			Wheel wheel = wheels.get(i);
+			x[i] = wheel.getAxis().x;
+			y[i] = wheel.getAxis().y;
+		}
+		
+		strokeWeight(.1F);
+		
+//		for (int p = 0; p < Wheel.TRAIL_POINTS; p++) {
+//			beginShape();
+//			for (int w = 0; w < wheels.size(); w++) {
+//				Wheel wheel = wheels.get(w);
+//				x[w] -= wheel.trail[(wheel.trailLast - p) % Wheel.TRAIL_POINTS].x; 
+//				y[w] -= wheel.trail[(wheel.trailLast - p) % Wheel.TRAIL_POINTS].y;
+//				vertex(x[w], y[w]);
+//			}
+//			endShape(CLOSE);
+//		}
+		
+		popStyle();
 	}
 
 	void drawAxes() {
@@ -135,17 +289,5 @@ public class TestScene extends Scene {
 		popStyle();
 	}
 
-	void clear() {
-		background(196);
-		resetMatrix();
-	}
-
-	void drawFps() {
-		pushStyle();
-		textAlign(RIGHT, BOTTOM);
-		text("" + (round(frameRate * 10) / 10.0) + " FPS", width, height);
-		popStyle();
-	}
-	
 	
 }

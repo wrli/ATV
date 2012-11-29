@@ -1,20 +1,20 @@
 package atv;
 
-public class Point {
+public class PointF {
 	
-	public int x;
-	public int y;
-	public int z;
+	public float x;
+	public float y;
+	public float z;
 	
-	public Point() { 		
+	public PointF() { 		
 	}
 	
-	public Point(int x, int y) {
+	public PointF(float x, float y) {
 		this.x = x;
 		this.y = y;
 	}
 
-	public Point(int x, int y, int z) {
+	public PointF(float x, float y, float z) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
